@@ -5,8 +5,18 @@ name: template-ci
 
 on:
   pull_request:
+    paths:
+      - copier.yml
+      - template/**
+      - .github/workflows/**
+      - scripts/**
   push:
     branches: [main]
+    paths:
+      - copier.yml
+      - template/**
+      - .github/workflows/**
+      - scripts/**
 
 permissions:
   contents: read
