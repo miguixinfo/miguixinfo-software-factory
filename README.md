@@ -32,11 +32,14 @@ cd ~/dev/proyecto-existente
 
 Añade las piezas de la factory en una rama sin tocar el código, para revisarlo en una PR.
 
-## Actualizar proyectos cuando la factory cambia
+## Versiones de la factory
 
-- **Gates:** los proyectos llaman a los workflows reutilizables de este repo, así que un cambio aquí les llega solo.
-  Para estabilidad, publica tags (`v1`, `v1.1`) y pon `factory_ref` a un tag en vez de `main`.
-- **Plantilla:** dentro del proyecto, `copier update --trust` trae los cambios de la plantilla como diff para revisar.
+- Cada merge a `main` actualiza una PR de release que abre release-please, con la próxima versión
+  calculada a partir de los Conventional Commits (`fix` sube el parche, `feat` la menor, `feat!` la mayor) y su changelog.
+- Al fusionar esa PR se crean el tag `vX.Y.Z` y la release, y el tag mayor (`v1`) se mueve a esa versión.
+- Los proyectos apuntan a `@v1` (`factory_ref` en Copier): reciben arreglos y mejoras compatibles sin tocar nada.
+  Un cambio incompatible sale como `v2`, y cada proyecto migra cuando quiera cambiando `@v1` por `@v2`.
+- **Plantilla:** dentro de un proyecto, `copier update --trust` trae los cambios de la plantilla como diff para revisar.
 
 ## Qué hay dentro
 
@@ -63,5 +66,7 @@ springdoc. React + Vite + TypeScript estricto. Docker Compose + Caddy en Hetzner
 
 - **Settings → Actions → General → Access:** "Accessible from repositories owned by the user".
   Sin esto, los proyectos privados no pueden usar los workflows reutilizables de este repo privado.
+- **Settings → Actions → General → Workflow permissions:** marca "Allow GitHub Actions to create and approve pull requests".
+  Sin esto, release-please no puede abrir la PR de release.
 - **Repos privados y protección de ramas:** en una cuenta personal Free, GitHub no aplica reglas de protección
   a repos privados. Con GitHub Pro (4 USD/mes) el check `gate` bloquea el merge de verdad; sin él solo lo marca en rojo.

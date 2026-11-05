@@ -48,7 +48,7 @@ factory_repo:
 factory_ref:
   type: str
   help: Versión de la factory a usar en los workflows (tag o rama)
-  default: main
+  default: v1
 
 java_group:
   type: str

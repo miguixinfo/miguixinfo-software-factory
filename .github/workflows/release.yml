@@ -1,0 +1,48 @@
+# Versionado de la factory.
+# 1. release-please mantiene abierta una PR de release con la próxima versión (según los
+#    Conventional Commits) y su changelog. Al fusionarla crea el tag vX.Y.Z y la release.
+# 2. Después se mueve el tag mayor (v1, v2...) a esa versión. Los proyectos apuntan a @v1:
+#    reciben arreglos y mejoras compatibles, y un cambio incompatible sale como v2.
+name: release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+      major: ${{ steps.release.outputs.major }}
+      sha: ${{ steps.release.outputs.sha }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  move-major-tag:
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Mover v${{ needs.release-please.outputs.major }} a ${{ needs.release-please.outputs.tag }}
+        env:
+          MAJOR: v${{ needs.release-please.outputs.major }}
+          SHA: ${{ needs.release-please.outputs.sha }}
+        run: |
+          git tag -f "$MAJOR" "$SHA"
+          git push -f origin "refs/tags/$MAJOR"
+          echo "### $MAJOR apunta ahora a ${{ needs.release-please.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
