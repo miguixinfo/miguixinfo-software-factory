@@ -57,6 +57,8 @@ jobs:
           copier copy --vcs-ref=HEAD --trust --defaults \
             -d project_name="Demo ${{ matrix.type }}" -d project_type=${{ matrix.type }} \
             . "$RUNNER_TEMP/demo"
+          # Como hace new-project.sh: el proyecto generado es un repo git (actionlint lo necesita)
+          git -C "$RUNNER_TEMP/demo" init -q -b main
       - name: Backend
         if: matrix.type != 'web'
         working-directory: ${{ runner.temp }}/demo/backend
