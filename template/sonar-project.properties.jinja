@@ -1,0 +1,24 @@
+sonar.projectKey={{ github_owner }}_{{ project_slug }}
+sonar.organization={{ github_owner | lower }}
+sonar.projectName={{ project_name }}
+sonar.sourceEncoding=UTF-8
+{%- if has_backend and has_frontend %}
+sonar.sources=backend/src/main,frontend/src
+sonar.tests=backend/src/test,frontend/src
+{%- elif has_backend %}
+sonar.sources=backend/src/main
+sonar.tests=backend/src/test
+{%- else %}
+sonar.sources=frontend/src
+sonar.tests=frontend/src
+{%- endif %}
+{%- if has_backend %}
+sonar.java.binaries=backend/target/classes
+sonar.java.test.binaries=backend/target/test-classes
+sonar.coverage.jacoco.xmlReportPaths=backend/target/site/jacoco/jacoco.xml
+{%- endif %}
+{%- if has_frontend %}
+sonar.test.inclusions=frontend/src/**/*.test.ts,frontend/src/**/*.test.tsx
+sonar.exclusions=frontend/src/**/*.test.ts,frontend/src/**/*.test.tsx,frontend/src/api/schema.d.ts,frontend/src/main.tsx
+sonar.javascript.lcov.reportPaths=frontend/coverage/lcov.info
+{%- endif %}

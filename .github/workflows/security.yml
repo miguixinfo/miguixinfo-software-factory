@@ -1,0 +1,53 @@
+# Gate de seguridad (reutilizable), con herramientas gratuitas que funcionan en repos privados:
+# - gitleaks: secretos en el historial
+# - Semgrep CE: análisis estático (SAST)
+# - Trivy: vulnerabilidades en dependencias y configuración (SCA + IaC)
+name: security
+
+on:
+  workflow_call:
+    inputs:
+      severity:
+        type: string
+        default: HIGH,CRITICAL
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:latest \
+            git /repo --redact --no-banner --exit-code 1
+
+  sast:
+    name: sast
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Semgrep
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src semgrep/semgrep:latest \
+            semgrep scan --config p/default --config p/java --config p/typescript --config p/secrets \
+            --metrics=off --error --severity ERROR
+
+  dependencies:
+    name: dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Trivy (dependencias, configuración y secretos)
+        run: |
+          docker run --rm -v "$PWD:/src" -v trivy-cache:/root/.cache aquasec/trivy:latest \
+            fs /src --scanners vuln,misconfig --severity "${{ inputs.severity }}" \
+            --ignore-unfixed --exit-code 1 --skip-dirs /src/node_modules --skip-dirs /src/frontend/node_modules

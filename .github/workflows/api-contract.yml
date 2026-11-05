@@ -1,0 +1,60 @@
+# Gate de contrato de API (reutilizable). Compara docs/api/openapi.json de la PR con el de la rama
+# destino y bloquea los cambios incompatibles. Para aceptar uno a propósito (versión mayor),
+# añade la etiqueta "breaking-change" a la PR.
+name: api-contract
+
+on:
+  workflow_call:
+    inputs:
+      spec-path:
+        type: string
+        default: docs/api/openapi.json
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  breaking-changes:
+    name: breaking-changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Contrato de la rama destino
+        id: base
+        run: |
+          if git show "origin/${{ github.base_ref }}:${{ inputs.spec-path }}" > /tmp/base-openapi.json 2>/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No hay contrato en la rama destino todavía; nada que comparar."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Cambios incompatibles (oasdiff)
+        if: steps.base.outputs.exists == 'true' && hashFiles(inputs.spec-path) != ''
+        env:
+          ALLOW_BREAKING: ${{ contains(github.event.pull_request.labels.*.name, 'breaking-change') }}
+        run: |
+          docker run --rm -v /tmp:/base -v "$PWD:/pr" tufin/oasdiff \
+            breaking /base/base-openapi.json "/pr/${{ inputs.spec-path }}" --format markdown > /tmp/breaking.md || true
+          cat /tmp/breaking.md >> "$GITHUB_STEP_SUMMARY"
+          if ! docker run --rm -v /tmp:/base -v "$PWD:/pr" tufin/oasdiff \
+               breaking /base/base-openapi.json "/pr/${{ inputs.spec-path }}" --fail-on ERR; then
+            if [ "$ALLOW_BREAKING" = "true" ]; then
+              echo "::warning::Cambios incompatibles aceptados con la etiqueta breaking-change."
+            else
+              echo "::error::La PR rompe el contrato de la API. Si es intencionado, añade la etiqueta breaking-change."
+              exit 1
+            fi
+          fi
+
+      - name: Estilo del contrato (Spectral)
+        if: hashFiles(inputs.spec-path) != ''
+        run: |
+          echo 'extends: ["spectral:oas"]' > /tmp/.spectral.yaml
+          npx --yes @stoplight/spectral-cli@6 lint "${{ inputs.spec-path }}" --ruleset /tmp/.spectral.yaml --fail-severity error

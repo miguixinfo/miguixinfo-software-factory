@@ -1,0 +1,33 @@
+# Configuración de control de la Software Factory para este proyecto.
+# Es la fuente de verdad que leen los agentes (CLAUDE.md / AGENTS.md la referencian)
+# y los workflows. Ajústala a medida que ganes confianza.
+
+factory:
+  repo: {{ factory_repo }}
+  ref: {{ factory_ref }}
+
+# Controles humanos obligatorios. Valores posibles: spec, story, merge.
+human_gates:
+{%- for gate in human_gates %}
+  - {{ gate }}
+{%- endfor %}
+
+quality:
+  coverage_min: {{ coverage_min }}
+  # Un gate fallido bloquea la PR. No hay modo "solo aviso" en v1.
+  block_on_failure: true
+
+agents:
+  # Máximo de historias en paralelo (una por worktree). Con Claude Pro, 2 es un buen punto de partida.
+  max_parallel_stories: 2
+  # Rutas que ningún agente debe tocar sin una historia que lo pida explícitamente.
+  protected_paths:
+    - .github/workflows/
+    - factory.yml
+{%- if has_backend %}
+    - backend/src/main/resources/db/migration/
+    - backend/src/main/java/{{ package_path }}/shared/config/SecurityConfig.java
+{%- endif %}
+{%- if include_deploy %}
+    - infra/
+{%- endif %}

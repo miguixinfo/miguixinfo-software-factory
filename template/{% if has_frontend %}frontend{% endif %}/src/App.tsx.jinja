@@ -1,0 +1,25 @@
+import { useEffect, useState } from 'react';
+import { fetchHealth, type HealthStatus } from './api/health';
+
+export function App() {
+  const [status, setStatus] = useState<HealthStatus>('checking');
+
+  useEffect(() => {
+    let active = true;
+    fetchHealth().then((s) => {
+      if (active) setStatus(s);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return (
+    <main>
+      <h1>{{ project_name }}</h1>
+      <p>
+        Estado del backend: <strong data-testid="health">{status}</strong>
+      </p>
+    </main>
+  );
+}

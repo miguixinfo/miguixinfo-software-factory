@@ -1,0 +1,14 @@
+global:
+  scrape_interval: 30s
+
+scrape_configs:
+{%- if has_backend %}
+  - job_name: {{ project_slug }}-backend
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["backend:8080"]
+{%- else %}
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+{%- endif %}

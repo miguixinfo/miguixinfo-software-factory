@@ -1,0 +1,68 @@
+# Producción en el VPS. La copia el workflow Deploy a ~/apps/{{ project_slug }} y la arranca con:
+#   docker compose --env-file .env up -d
+name: {{ project_slug }}
+
+services:
+{%- if has_backend %}
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-{{ project_slug | replace('-', '_') }}}
+      POSTGRES_USER: ${DB_USER:?falta DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?falta DB_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      retries: 5
+    networks: [internal]
+
+  backend:
+    image: ghcr.io/{{ github_owner | lower }}/{{ project_slug }}-backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-{{ project_slug | replace('-', '_') }}}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [internal, edge]
+{%- endif %}
+
+  edge:
+{%- if has_frontend %}
+    image: ghcr.io/{{ github_owner | lower }}/{{ project_slug }}-frontend:${IMAGE_TAG:-latest}
+{%- else %}
+    image: caddy:2-alpine
+{%- endif %}
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-{{ domain }}}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+{%- if not has_frontend %}
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+{%- endif %}
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [edge]
+
+volumes:
+{%- if has_backend %}
+  db-data:
+{%- endif %}
+  caddy-data:
+  caddy-config:
+
+networks:
+  edge:
+{%- if has_backend %}
+  internal:
+    internal: true
+{%- endif %}

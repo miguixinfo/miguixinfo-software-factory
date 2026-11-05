@@ -1,0 +1,26 @@
+package {{ java_package }}.item.adapter.out.persistence;
+
+import {{ java_package }}.item.domain.model.Item;
+import {{ java_package }}.item.domain.port.out.ItemRepository;
+import java.util.List;
+import org.springframework.stereotype.Component;
+
+@Component
+class ItemPersistenceAdapter implements ItemRepository {
+
+    private final ItemJpaRepository jpa;
+
+    ItemPersistenceAdapter(ItemJpaRepository jpa) {
+        this.jpa = jpa;
+    }
+
+    @Override
+    public Item save(Item item) {
+        return jpa.save(ItemJpaEntity.fromDomain(item)).toDomain();
+    }
+
+    @Override
+    public List<Item> findAll() {
+        return jpa.findAll().stream().map(ItemJpaEntity::toDomain).toList();
+    }
+}

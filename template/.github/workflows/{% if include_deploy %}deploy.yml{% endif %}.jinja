@@ -1,0 +1,28 @@
+# Despliegue al VPS cuando main pasa CI. Requiere los secretos VPS_HOST, VPS_USER, VPS_SSH_KEY
+# y la variable DOMAIN (Settings → Secrets and variables → Actions).
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: {% raw %}${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}{% endraw %}
+    uses: {{ factory_repo }}/.github/workflows/deploy-vps.yml@{{ factory_ref }}
+    with:
+      project-slug: {{ project_slug }}
+      has-backend: {{ has_backend | lower }}
+      has-frontend: {{ has_frontend | lower }}
+    secrets: inherit

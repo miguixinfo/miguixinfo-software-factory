@@ -1,0 +1,11 @@
+package {{ java_package }}.item.domain.port.out;
+
+import {{ java_package }}.item.domain.model.Item;
+import java.util.List;
+
+public interface ItemRepository {
+
+    Item save(Item item);
+
+    List<Item> findAll();
+}

@@ -1,0 +1,54 @@
+# Quality gates del proyecto. La lógica vive en la factory ({{ factory_repo }}),
+# así un ajuste en un gate llega a todos los proyectos a la vez.
+# El único check requerido en la protección de main es "gate".
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-{% raw %}${{ github.ref }}{% endraw %}
+  cancel-in-progress: true
+
+jobs:
+{%- if has_backend %}
+  backend:
+    uses: {{ factory_repo }}/.github/workflows/backend-ci.yml@{{ factory_ref }}
+{%- endif %}
+{%- if has_frontend %}
+  frontend:
+    uses: {{ factory_repo }}/.github/workflows/frontend-ci.yml@{{ factory_ref }}
+{%- endif %}
+{%- if has_backend %}
+  contract:
+    uses: {{ factory_repo }}/.github/workflows/api-contract.yml@{{ factory_ref }}
+{%- endif %}
+  security:
+    uses: {{ factory_repo }}/.github/workflows/security.yml@{{ factory_ref }}
+  sonar:
+    needs: [{% if has_backend %}backend{% endif %}{% if has_backend and has_frontend %}, {% endif %}{% if has_frontend %}frontend{% endif %}]
+    uses: {{ factory_repo }}/.github/workflows/sonar.yml@{{ factory_ref }}
+    with:
+      project-key: {{ github_owner }}_{{ project_slug }}
+      organization: {{ github_owner | lower }}
+    secrets:
+      SONAR_TOKEN: {% raw %}${{ secrets.SONAR_TOKEN }}{% endraw %}
+
+  gate:
+    name: gate
+    if: always()
+    needs: [{% if has_backend %}backend, contract, {% endif %}{% if has_frontend %}frontend, {% endif %}security, sonar]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Todos los gates en verde
+        run: |
+          echo '{% raw %}${{ toJSON(needs) }}{% endraw %}'
+          if [ "{% raw %}${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}{% endraw %}" = "true" ]; then
+            echo "::error::Al menos un gate ha fallado. La PR queda bloqueada."
+            exit 1
+          fi

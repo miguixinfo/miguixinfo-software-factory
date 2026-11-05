@@ -1,0 +1,46 @@
+# Instrucciones para agentes
+
+Proyecto **{{ project_name }}**. {{ description }}
+
+Antes de escribir código, lee en este orden:
+
+1. `docs/constitution.md`: reglas no negociables.
+2. `factory.yml`: controles humanos, cobertura mínima y rutas protegidas.
+3. La historia BMAD que te han asignado en `docs/stories/`.
+
+## Cómo trabajas
+
+- Trabaja solo en la historia asignada, en su worktree y su rama. Si descubres trabajo extra, anótalo en la historia como pendiente; no lo hagas.
+- No toques las rutas protegidas de `factory.yml` salvo que la historia lo pida de forma explícita.
+- Escribe primero los tests de los criterios de aceptación, después la implementación.
+- No des una tarea por terminada sin haber ejecutado las comprobaciones locales y pegado su resultado en la PR.
+- Si un gate falla, arregla la causa. Nunca desactives un gate, ni bajes umbrales, ni ignores tests.
+
+## Comprobaciones locales (antes de cada push)
+{% if has_backend %}
+```bash
+cd backend && ./mvnw -B spotless:apply verify   # formato, tests, arquitectura, cobertura y contrato OpenAPI
+```
+{%- endif %}
+{%- if has_frontend %}
+```bash
+cd frontend && npm run format && npm run lint && npm run test:coverage && npm run build
+```
+{%- endif %}
+
+## Estructura
+{% if has_backend %}
+- `backend/`: Spring Boot 4, Java 25, hexagonal. Módulo de ejemplo: `item` (bórralo cuando tengas el primer módulo real).
+{%- endif %}
+{%- if has_frontend %}
+- `frontend/`: React + Vite + TypeScript estricto.
+{%- endif %}
+- `docs/`: artefactos BMAD (brief, PRD, arquitectura, epics, historias) y contrato de API.
+{%- if include_deploy %}
+- `infra/`: Docker Compose y monitorización para el VPS.
+{%- endif %}
+
+## Pull requests
+
+- Título en Conventional Commits; cuerpo con la plantilla de `.github/pull_request_template.md`.
+- Enlaza la issue con `Closes #<n>` y la historia con su ruta.
