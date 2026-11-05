@@ -1,0 +1,96 @@
+# Despliegue al VPS (reutilizable): construye las imágenes, las publica en GHCR y actualiza
+# Docker Compose en el servidor por SSH.
+# Secretos del proyecto: VPS_HOST, VPS_USER, VPS_SSH_KEY. Variable: DOMAIN.
+# En el VPS: Docker instalado y ~/apps/<proyecto>/.env creado a partir de infra/.env.example.
+name: deploy-vps
+
+on:
+  workflow_call:
+    inputs:
+      project-slug:
+        type: string
+        required: true
+      has-backend:
+        type: boolean
+        default: true
+      has-frontend:
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  images:
+    name: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: tag
+        run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - id: owner
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Imagen del backend
+        if: inputs.has-backend
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: |
+            ghcr.io/${{ steps.owner.outputs.owner }}/${{ inputs.project-slug }}-backend:${{ steps.tag.outputs.tag }}
+            ghcr.io/${{ steps.owner.outputs.owner }}/${{ inputs.project-slug }}-backend:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+      - name: Imagen del frontend
+        if: inputs.has-frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: true
+          tags: |
+            ghcr.io/${{ steps.owner.outputs.owner }}/${{ inputs.project-slug }}-frontend:${{ steps.tag.outputs.tag }}
+            ghcr.io/${{ steps.owner.outputs.owner }}/${{ inputs.project-slug }}-frontend:latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+  release:
+    name: release
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+      - name: Clave SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+      - name: Copiar infra y desplegar
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.images.outputs.tag }}
+          APP: ${{ inputs.project-slug }}
+        run: |
+          SSH="ssh -i ~/.ssh/id_deploy $VPS_USER@$VPS_HOST"
+          $SSH "mkdir -p ~/apps/$APP"
+          scp -i ~/.ssh/id_deploy -r infra/. "$VPS_USER@$VPS_HOST:~/apps/$APP/"
+          $SSH "cd ~/apps/$APP && test -f .env || { echo 'Falta ~/apps/$APP/.env (copia .env.example)'; exit 1; }"
+          echo "$GHCR_TOKEN" | $SSH "docker login ghcr.io -u ${{ github.actor }} --password-stdin"
+          $SSH "cd ~/apps/$APP && sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG=$TAG/' .env && docker compose --env-file .env pull && docker compose --env-file .env up -d --remove-orphans && docker image prune -f"
+          $SSH "docker logout ghcr.io"

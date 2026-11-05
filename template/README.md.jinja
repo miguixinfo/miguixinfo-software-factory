@@ -1,0 +1,50 @@
+# {{ project_name }}
+
+{{ description }}
+
+Proyecto generado con la [Software Factory]({{ 'https://github.com/' ~ factory_repo }}). Las reglas del proyecto están en [`docs/constitution.md`](docs/constitution.md) y la configuración de control en [`factory.yml`](factory.yml).
+
+## Arranque en local
+
+Requisitos: {% if has_backend %}Java 25, Docker (para PostgreSQL y Testcontainers){% endif %}{% if has_backend and has_frontend %}, {% endif %}{% if has_frontend %}Node 24{% endif %}, [lefthook](https://lefthook.dev).
+
+```bash
+lefthook install
+{%- if has_backend %}
+docker run -d --name {{ project_slug }}-db -p 5432:5432 \
+  -e POSTGRES_DB={{ project_slug | replace('-', '_') }} -e POSTGRES_USER=app -e POSTGRES_PASSWORD=app postgres:17-alpine
+cd backend && ./mvnw spring-boot:run
+{%- endif %}
+{%- if has_frontend %}
+cd frontend && npm ci && npm run dev
+{%- endif %}
+```
+{% if has_backend %}
+- API: http://localhost:8080/api
+- Documentación: http://localhost:8080/swagger-ui.html
+{%- endif %}
+{%- if has_frontend %}
+- Web: http://localhost:5173
+{%- endif %}
+
+## Flujo de trabajo
+
+1. Planifica con BMAD (`npx bmad-method install` la primera vez). Los artefactos van a `docs/`.
+2. Cada historia aprobada se convierte en una issue con la etiqueta `ready`.
+3. Cada historia se implementa en su propio worktree y su rama, y termina en una PR.
+4. CI ejecuta los quality gates. El check `gate` es el único requerido para fusionar.
+5. Revisas y fusionas con squash. Release y despliegue son automáticos.
+
+## Quality gates
+
+| Gate | Herramienta | Bloquea si |
+| --- | --- | --- |
+{%- if has_backend %}
+| Backend | Maven, JUnit, Testcontainers, ArchUnit, Spotless, JaCoCo | Falla un test, se rompe la arquitectura hexagonal, hay código sin formatear o la cobertura baja de {{ coverage_min }}% |
+| Contrato | oasdiff sobre `docs/api/openapi.json` | Hay cambios incompatibles en la API o el contrato no está actualizado |
+{%- endif %}
+{%- if has_frontend %}
+| Frontend | ESLint, Prettier, TypeScript, Vitest | Errores de lint, formato o tipos, tests rojos o cobertura bajo {{ coverage_min }}% |
+{%- endif %}
+| Seguridad | Semgrep, gitleaks, Trivy | Vulnerabilidad alta o crítica, o un secreto en el código |
+| Calidad | SonarQube Cloud (si hay `SONAR_TOKEN`) | No pasa el quality gate de Sonar |

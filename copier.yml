@@ -1,0 +1,106 @@
+# Plantilla de proyecto de la miguixinfo Software Factory.
+# Uso: copier copy gh:miguixinfo/miguixinfo-software-factory mi-proyecto --trust
+# Actualizar un proyecto existente: copier update --trust
+
+_min_copier_version: "9.3.0"
+_subdirectory: template
+_templates_suffix: .jinja
+_answers_file: .copier-answers.yml
+_skip_if_exists:
+  - docs/constitution.md
+  - factory.yml
+
+project_name:
+  type: str
+  help: Nombre legible del proyecto
+  validator: "{% if not project_name %}Obligatorio{% endif %}"
+
+project_slug:
+  type: str
+  help: Identificador en minúsculas con guiones (nombre del repo)
+  default: "{{ project_name | lower | replace(' ', '-') }}"
+  validator: "{% if not (project_slug | regex_search('^[a-z][a-z0-9-]*$')) %}Solo minúsculas, números y guiones{% endif %}"
+
+description:
+  type: str
+  help: Una frase sobre qué hace el proyecto
+  default: ""
+
+project_type:
+  type: str
+  help: Tipo de proyecto
+  choices:
+    Web full stack (Spring Boot + React): fullstack
+    Solo API (Spring Boot): api
+    Solo web (React): web
+  default: fullstack
+
+github_owner:
+  type: str
+  help: Usuario u organización de GitHub
+  default: miguixinfo
+
+factory_repo:
+  type: str
+  help: Repo de la factory (de donde salen los workflows reutilizables)
+  default: miguixinfo/miguixinfo-software-factory
+
+factory_ref:
+  type: str
+  help: Versión de la factory a usar en los workflows (tag o rama)
+  default: main
+
+java_group:
+  type: str
+  help: groupId de Maven
+  default: dev.miguixinfo
+  when: "{{ project_type != 'web' }}"
+
+java_package:
+  type: str
+  help: Paquete Java raíz
+  default: "{{ java_group }}.{{ project_slug | replace('-', '') }}"
+  when: "{{ project_type != 'web' }}"
+  validator: "{% if not (java_package | regex_search('^[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)+$')) %}Paquete Java no válido{% endif %}"
+
+coverage_min:
+  type: int
+  help: Cobertura mínima exigida (%)
+  default: 80
+
+human_gates:
+  type: str
+  help: Controles humanos obligatorios
+  multiselect: true
+  choices:
+    Aprobar la spec (PRD, arquitectura, historias): spec
+    Aprobar cada historia antes de implementarla: story
+    Aprobar el merge: merge
+  default: [spec, merge]
+
+include_deploy:
+  type: bool
+  help: ¿Incluir despliegue en el VPS (Docker Compose + Caddy)?
+  default: true
+
+domain:
+  type: str
+  help: Dominio público (para Caddy y HTTPS)
+  default: "{{ project_slug }}.example.com"
+  when: "{{ include_deploy }}"
+
+# Valores derivados (no se preguntan)
+has_backend:
+  type: bool
+  default: "{{ project_type in ['fullstack', 'api'] }}"
+  when: false
+
+has_frontend:
+  type: bool
+  default: "{{ project_type in ['fullstack', 'web'] }}"
+  when: false
+
+package_path:
+  type: str
+  default: "{{ (java_package | default('app')) | replace('.', '/') }}"
+  when: false

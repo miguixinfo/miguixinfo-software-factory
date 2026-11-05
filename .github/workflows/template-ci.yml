@@ -1,0 +1,64 @@
+# CI de la propia factory: genera un proyecto de cada tipo con Copier y comprueba que
+# compila, pasa sus tests y respeta sus propios gates. Así un cambio en la plantilla
+# no puede romper los proyectos que se generen después.
+name: template-ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color
+
+  render:
+    strategy:
+      fail-fast: false
+      matrix:
+        type: [fullstack, api, web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+      - run: pip install copier
+      - name: Generar proyecto ${{ matrix.type }}
+        run: |
+          copier copy --vcs-ref=HEAD --trust --defaults \
+            -d project_name="Demo ${{ matrix.type }}" -d project_type=${{ matrix.type }} \
+            . "$RUNNER_TEMP/demo"
+      - name: Backend
+        if: matrix.type != 'web'
+        working-directory: ${{ runner.temp }}/demo/backend
+        run: ./mvnw -B -ntp verify
+      - name: Frontend
+        if: matrix.type != 'api'
+        working-directory: ${{ runner.temp }}/demo/frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run lint
+          npm run format:check
+          npm run test:coverage
+          npm run build
+      - name: Workflows del proyecto generado
+        run: docker run --rm -v "$RUNNER_TEMP/demo:/repo" -w /repo rhysd/actionlint:latest -color

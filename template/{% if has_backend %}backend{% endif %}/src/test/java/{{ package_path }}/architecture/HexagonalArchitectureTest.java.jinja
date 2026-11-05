@@ -1,0 +1,40 @@
+package {{ java_package }}.architecture;
+
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+
+import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.junit.AnalyzeClasses;
+import com.tngtech.archunit.junit.ArchTest;
+import com.tngtech.archunit.lang.ArchRule;
+
+/**
+ * Reglas de la arquitectura hexagonal. Si un agente las rompe, el build falla.
+ * Estructura por módulo: domain (modelo y puertos), application (casos de uso), adapter (in/out).
+ */
+@AnalyzeClasses(packages = "{{ java_package }}", importOptions = ImportOption.DoNotIncludeTests.class)
+class HexagonalArchitectureTest {
+
+    @ArchTest
+    static final ArchRule domainIsPureJava = noClasses()
+            .that()
+            .resideInAPackage("..domain..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("org.springframework..", "jakarta.persistence..", "..application..", "..adapter..");
+
+    @ArchTest
+    static final ArchRule applicationDoesNotKnowAdaptersOrSpring = noClasses()
+            .that()
+            .resideInAPackage("..application..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("org.springframework..", "jakarta.persistence..", "..adapter..");
+
+    @ArchTest
+    static final ArchRule adaptersDoNotTalkToEachOther = noClasses()
+            .that()
+            .resideInAPackage("..adapter.in..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("..adapter.out..");
+}

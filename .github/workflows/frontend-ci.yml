@@ -1,0 +1,50 @@
+# Gate de frontend (reutilizable): lint, formato, tipos, tests con cobertura mínima y build.
+name: frontend-ci
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        type: string
+        default: frontend
+      node-version:
+        type: string
+        default: "24"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+
+      - run: npm ci --no-audit --no-fund
+      - name: Lint
+        run: npm run lint
+      - name: Formato
+        run: npm run format:check
+      - name: Tests y cobertura
+        run: npm run test:coverage
+      - name: Tipos y build
+        run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-reports
+          path: ${{ inputs.working-directory }}/coverage/lcov.info
+          retention-days: 3
+          if-no-files-found: ignore

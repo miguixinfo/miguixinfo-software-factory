@@ -1,0 +1,52 @@
+# Constitución de {{ project_name }}
+
+Reglas no negociables del proyecto. Las leen las personas y los agentes antes de cada historia. Si una regla estorba, se cambia aquí en una PR propia, nunca se ignora en silencio.
+
+## 1. Flujo de trabajo
+
+1. Todo trabajo nace de una historia BMAD en `docs/stories/` con criterios de aceptación verificables, y tiene su issue en GitHub.
+2. Una historia = un worktree = una rama = una PR. La rama sale siempre de `origin/main` y se llama `<tipo>/<issue>-<slug>` (por ejemplo `feat/12-alta-usuarios`).
+3. Controles humanos activos: {{ human_gates | join(', ') }} (ver `factory.yml`).
+4. Una historia debe caber en una PR que se pueda revisar en 15 minutos. Si no cabe, se divide antes de empezar.
+5. Commits con [Conventional Commits](https://www.conventionalcommits.org/es/). La PR se fusiona con squash y su título es el mensaje final.
+
+## 2. Arquitectura
+{% if has_backend %}
+- Backend con arquitectura hexagonal, organizado por módulo de negocio (`<modulo>/domain`, `<modulo>/application`, `<modulo>/adapter/in`, `<modulo>/adapter/out`).
+- `domain` es Java puro: sin Spring, sin JPA, sin nada de `application` ni `adapter`.
+- `application` implementa los puertos de entrada y solo conoce puertos de salida. Sin anotaciones de Spring; se cablea en la clase `*Config` del módulo.
+- Los adaptadores de entrada nunca llaman a los de salida.
+- Estas reglas las comprueba `HexagonalArchitectureTest`. Si falla, el diseño está mal, no el test.
+- Cambios de base de datos solo con migraciones Flyway nuevas. Nunca se edita una migración ya fusionada.
+- La API se documenta con springdoc. El contrato vive en `docs/api/openapi.json`, lo regenera la suite de tests y se versiona en cada PR.
+- Errores HTTP en formato Problem Details (RFC 9457).
+{%- endif %}
+{%- if has_frontend %}
+- Frontend con React + Vite + TypeScript estricto. Prohibido `any` y `@ts-ignore`.
+{%- if has_backend %}
+- Los tipos de la API se generan desde el contrato (`npm run api:generate`), no se escriben a mano.
+{%- endif %}
+{%- endif %}
+
+## 3. Calidad
+
+- Cobertura mínima de {{ coverage_min }}% en líneas y ramas. La comprueban {% if has_backend %}JaCoCo{% endif %}{% if has_backend and has_frontend %} y {% endif %}{% if has_frontend %}Vitest{% endif %} en el build y SonarQube en la PR.
+- Cada criterio de aceptación de la historia tiene al menos un test que lo demuestra.
+- Ningún gate se desactiva, se salta ni se marca como opcional para conseguir verde. Tampoco se borran ni se marcan como ignorados tests que fallan.
+- El formato no se discute: lo aplican {% if has_backend %}Spotless{% endif %}{% if has_backend and has_frontend %} y {% endif %}{% if has_frontend %}Prettier/ESLint{% endif %}.
+
+## 4. Seguridad
+{% if has_backend %}
+- Seguridad con Spring Security propia; todo endpoint nuevo es privado salvo que la historia diga lo contrario.
+- Primera historia de cada proyecto: autenticación propia con JWT (alta, login, refresco, roles).
+{%- endif %}
+- Ningún secreto en el repositorio. Configuración sensible solo por variables de entorno o secretos de GitHub.
+- Dependencias nuevas solo si la historia lo justifica, y deben pasar el escaneo de seguridad.
+
+## 5. Definición de hecho
+
+- [ ] Criterios de aceptación cubiertos por tests
+- [ ] Gates de CI en verde
+- [ ] Contrato de API actualizado si cambia la API, sin cambios incompatibles no declarados
+- [ ] Documentación BMAD actualizada (historia marcada como hecha, decisiones en `docs/architecture.md`)
+- [ ] PR enlazada a su issue y a su historia

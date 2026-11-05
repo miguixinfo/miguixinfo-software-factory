@@ -1,0 +1,70 @@
+# Gate de SonarQube Cloud (reutilizable). Usa los informes de backend-ci y frontend-ci.
+# Si el proyecto no tiene el secreto SONAR_TOKEN, se salta sin fallar (útil al arrancar).
+# La configuración del análisis vive en sonar-project.properties del proyecto.
+name: sonar
+
+on:
+  workflow_call:
+    inputs:
+      project-key:
+        type: string
+        required: true
+      organization:
+        type: string
+        required: true
+    secrets:
+      SONAR_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  analysis:
+    name: analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - name: ¿Hay token de Sonar?
+        id: token
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "::warning::SONAR_TOKEN no configurado: se salta el análisis de SonarQube."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v5
+        if: steps.token.outputs.present == 'true'
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        if: steps.token.outputs.present == 'true'
+        continue-on-error: true
+        with:
+          name: backend-reports
+          path: backend/target
+
+      - uses: actions/download-artifact@v4
+        if: steps.token.outputs.present == 'true'
+        continue-on-error: true
+        with:
+          name: frontend-reports
+          path: frontend/coverage
+
+      - name: Rutas de cobertura del frontend relativas a la raíz
+        if: steps.token.outputs.present == 'true' && hashFiles('frontend/coverage/lcov.info') != ''
+        run: sed -i 's|^SF:src/|SF:frontend/src/|' frontend/coverage/lcov.info
+
+      - uses: SonarSource/sonarqube-scan-action@v5
+        if: steps.token.outputs.present == 'true'
+        with:
+          args: >
+            -Dsonar.projectKey=${{ inputs.project-key }}
+            -Dsonar.organization=${{ inputs.organization }}
+            -Dsonar.qualitygate.wait=true

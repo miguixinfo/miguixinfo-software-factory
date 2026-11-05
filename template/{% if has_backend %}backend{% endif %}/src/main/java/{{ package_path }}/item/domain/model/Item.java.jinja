@@ -1,0 +1,28 @@
+package {{ java_package }}.item.domain.model;
+
+import java.util.Objects;
+import java.util.UUID;
+
+/**
+ * Ejemplo de entidad de dominio. Sin dependencias de Spring ni de JPA.
+ * Sustitúyela por tu primer agregado real y borra el módulo item cuando ya no sirva de guía.
+ */
+public record Item(UUID id, String name) {
+
+    public static final int MAX_NAME_LENGTH = 120;
+
+    public Item {
+        Objects.requireNonNull(id, "id");
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("El nombre es obligatorio");
+        }
+        if (name.length() > MAX_NAME_LENGTH) {
+            throw new IllegalArgumentException("El nombre supera " + MAX_NAME_LENGTH + " caracteres");
+        }
+        name = name.strip();
+    }
+
+    public static Item create(String name) {
+        return new Item(UUID.randomUUID(), name);
+    }
+}

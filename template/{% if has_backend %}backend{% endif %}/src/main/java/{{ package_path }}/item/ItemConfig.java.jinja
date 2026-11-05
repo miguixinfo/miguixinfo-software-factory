@@ -1,0 +1,16 @@
+package {{ java_package }}.item;
+
+import {{ java_package }}.item.application.ItemService;
+import {{ java_package }}.item.domain.port.out.ItemRepository;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+/** Cableado del módulo: la única clase que conoce a la vez Spring y la capa de aplicación. */
+@Configuration
+class ItemConfig {
+
+    @Bean
+    ItemService itemService(ItemRepository itemRepository) {
+        return new ItemService(itemRepository);
+    }
+}

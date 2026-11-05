@@ -1,0 +1,22 @@
+/// <reference types="vitest/config" />
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],{% if has_backend %}
+  server: {
+    proxy: { '/api': 'http://localhost:8080' },
+  },{% endif %}
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/setupTests.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/main.tsx', 'src/**/*.d.ts', 'src/setupTests.ts'],
+      thresholds: { lines: {{ coverage_min }}, branches: {{ coverage_min }}, functions: {{ coverage_min }}, statements: {{ coverage_min }} },
+    },
+  },
+});

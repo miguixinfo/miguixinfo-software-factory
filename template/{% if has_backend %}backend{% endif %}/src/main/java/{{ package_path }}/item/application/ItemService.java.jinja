@@ -1,0 +1,27 @@
+package {{ java_package }}.item.application;
+
+import {{ java_package }}.item.domain.model.Item;
+import {{ java_package }}.item.domain.port.in.CreateItemUseCase;
+import {{ java_package }}.item.domain.port.in.ListItemsUseCase;
+import {{ java_package }}.item.domain.port.out.ItemRepository;
+import java.util.List;
+
+/** Casos de uso. Java puro: se cablea en {@code ItemConfig}, sin anotaciones de Spring. */
+public class ItemService implements CreateItemUseCase, ListItemsUseCase {
+
+    private final ItemRepository repository;
+
+    public ItemService(ItemRepository repository) {
+        this.repository = repository;
+    }
+
+    @Override
+    public Item create(String name) {
+        return repository.save(Item.create(name));
+    }
+
+    @Override
+    public List<Item> list() {
+        return repository.findAll();
+    }
+}

@@ -1,0 +1,33 @@
+name: Historia
+description: Historia BMAD lista para implementar
+title: "[Historia] "
+labels: [story]
+body:
+  - type: input
+    id: story
+    attributes:
+      label: Fichero de la historia
+      placeholder: docs/stories/1.1.alta-usuarios.md
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Como / quiero / para
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Criterios de aceptación
+      description: Uno por línea, verificables con un test
+      value: |
+        - [ ] 
+    validations:
+      required: true
+  - type: checkboxes
+    id: gate
+    attributes:
+      label: Control humano
+      options:
+        - label: Spec aprobada (añade la etiqueta `ready`)

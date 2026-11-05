@@ -1,0 +1,46 @@
+# Hooks locales: el agente se corrige solo en segundos, antes de que CI tenga que decírselo.
+# Instalación: npm i -g lefthook (o brew install lefthook) y después `lefthook install`.
+pre-commit:
+  parallel: true
+  commands:
+{%- if has_backend %}
+    backend-format:
+      root: backend/
+      glob: "*.java"
+      run: ./mvnw -q -B spotless:apply
+      stage_fixed: true
+{%- endif %}
+{%- if has_frontend %}
+    frontend-format:
+      root: frontend/
+      glob: "*.{ts,tsx,js,json,css,md}"
+      run: npx prettier --write {staged_files}
+      stage_fixed: true
+    frontend-lint:
+      root: frontend/
+      glob: "*.{ts,tsx}"
+      run: npx eslint --max-warnings 0 {staged_files}
+{%- endif %}
+    secrets:
+      run: if command -v gitleaks >/dev/null; then gitleaks git --staged --redact; else echo "gitleaks no instalado, se comprobará en CI"; fi
+
+commit-msg:
+  commands:
+    conventional:
+      run: |
+        head -1 {1} | grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9-]+\))?!?: .+' \
+          || (echo "El mensaje no sigue Conventional Commits. Ejemplo: feat(auth): alta de usuarios" && exit 1)
+
+pre-push:
+  parallel: true
+  commands:
+{%- if has_backend %}
+    backend-unit:
+      root: backend/
+      run: ./mvnw -q -B test -Djacoco.skip=true -Dtest='!*IntegrationTest' -Dsurefire.failIfNoSpecifiedTests=false
+{%- endif %}
+{%- if has_frontend %}
+    frontend-test:
+      root: frontend/
+      run: npm run typecheck && npm test
+{%- endif %}

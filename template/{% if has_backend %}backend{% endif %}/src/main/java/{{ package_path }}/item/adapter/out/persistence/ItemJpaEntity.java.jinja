@@ -1,0 +1,34 @@
+package {{ java_package }}.item.adapter.out.persistence;
+
+import {{ java_package }}.item.domain.model.Item;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import java.util.UUID;
+
+@Entity
+@Table(name = "item")
+class ItemJpaEntity {
+
+    @Id
+    private UUID id;
+
+    @Column(nullable = false, length = Item.MAX_NAME_LENGTH)
+    private String name;
+
+    protected ItemJpaEntity() {}
+
+    ItemJpaEntity(UUID id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+
+    static ItemJpaEntity fromDomain(Item item) {
+        return new ItemJpaEntity(item.id(), item.name());
+    }
+
+    Item toDomain() {
+        return new Item(id, name);
+    }
+}

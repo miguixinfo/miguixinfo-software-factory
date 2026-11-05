@@ -1,0 +1,55 @@
+package {{ java_package }}.item.application;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import {{ java_package }}.item.domain.model.Item;
+import {{ java_package }}.item.domain.port.out.ItemRepository;
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+class ItemServiceTest {
+
+    private final InMemoryItemRepository repository = new InMemoryItemRepository();
+    private final ItemService service = new ItemService(repository);
+
+    @Test
+    void createsAndListsItems() {
+        Item created = service.create("  Primer item ");
+
+        assertThat(created.name()).isEqualTo("Primer item");
+        assertThat(service.list()).containsExactly(created);
+    }
+
+    @Test
+    void rejectsBlankNames() {
+        assertThatThrownBy(() -> service.create(" ")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejectsNullNames() {
+        assertThatThrownBy(() -> service.create(null)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejectsTooLongNames() {
+        assertThatThrownBy(() -> service.create("x".repeat(Item.MAX_NAME_LENGTH + 1)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private static final class InMemoryItemRepository implements ItemRepository {
+        private final List<Item> items = new ArrayList<>();
+
+        @Override
+        public Item save(Item item) {
+            items.add(item);
+            return item;
+        }
+
+        @Override
+        public List<Item> findAll() {
+            return List.copyOf(items);
+        }
+    }
+}

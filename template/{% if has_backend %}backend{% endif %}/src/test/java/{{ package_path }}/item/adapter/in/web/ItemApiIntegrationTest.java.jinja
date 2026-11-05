@@ -1,0 +1,77 @@
+package {{ java_package }}.item.adapter.in.web;
+
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import {{ java_package }}.TestcontainersConfig;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+/** Prueba de extremo a extremo del backend: HTTP, seguridad, dominio, JPA, Flyway y PostgreSQL real. */
+@SpringBootTest
+@AutoConfigureMockMvc
+@Import(TestcontainersConfig.class)
+class ItemApiIntegrationTest {
+
+    @Autowired
+    MockMvc mvc;
+
+    @Test
+    void createsAndListsItems() throws Exception {
+        mvc.perform(post("/api/items")
+                        .with(user("test"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Primer item\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value("Primer item"));
+
+        mvc.perform(get("/api/items").with(user("test")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("Primer item"));
+    }
+
+    @Test
+    void rejectsInvalidRequests() throws Exception {
+        mvc.perform(post("/api/items")
+                        .with(user("test"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void requiresAuthentication() throws Exception {
+        mvc.perform(get("/api/items")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void healthIsPublic() throws Exception {
+        mvc.perform(get("/actuator/health")).andExpect(status().isOk());
+    }
+
+    /**
+     * Exporta el contrato OpenAPI a docs/api/openapi.json. Se versiona en cada PR y el gate de contrato
+     * lo compara con el de main para detectar cambios incompatibles.
+     */
+    @Test
+    void exportsOpenApiContract() throws Exception {
+        String spec = mvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Path contract = Path.of("..", "docs", "api", "openapi.json");
+        Files.createDirectories(contract.getParent());
+        Files.writeString(contract, spec.endsWith("\n") ? spec : spec + "\n");
+    }
+}
